@@ -1,0 +1,522 @@
+<!DOCTYPE html>
+<html lang="th">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Virtual Lab - ระบบจำแนกประเภทสัตว์ (3D Interactive)</title>
+
+<script type="module" src="https://ajax.googleapis.com/ajax/libs/model-viewer/3.5.0/model-viewer.min.js"></script>
+
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Segoe UI', Tahoma, sans-serif;
+    background: linear-gradient(135deg, #0a1628 0%, #1a3a5c 50%, #0d2137 100%);
+    min-height: 100vh;
+    color: #fff;
+    overflow: hidden;
+  }
+
+  header {
+    text-align: center;
+    padding: 20px;
+    background: rgba(0,0,0,0.4);
+    border-bottom: 2px solid #00d4ff;
+    height: 90px;
+  }
+
+  header h1 {
+    font-size: 1.8em;
+    color: #00d4ff;
+    text-shadow: 0 0 20px #00d4ff88;
+  }
+
+  header p { color: #aad4f5; font-size: 0.95em; margin-top: 5px; }
+
+  .main-layout {
+    display: flex;
+    height: calc(100vh - 90px);
+  }
+
+  /* ===== SIDEBAR (แถบซ้าย) ===== */
+  .sidebar {
+    width: 290px;
+    background: rgba(0,0,0,0.5);
+    border-right: 1px solid #00d4ff44;
+    overflow-y: auto;
+    padding: 10px;
+    flex-shrink: 0;
+  }
+
+  .group-title {
+    font-size: 0.78em;
+    color: #00d4ff;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 12px 8px 4px;
+    border-bottom: 1px solid #00d4ff33;
+    margin-bottom: 4px;
+  }
+
+  .animal-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 10px;
+    margin: 4px 0;
+    background: rgba(255,255,255,0.05);
+    border: 1px solid transparent;
+    border-radius: 8px;
+    color: #cce8ff;
+    cursor: pointer;
+    transition: all 0.2s;
+    font-size: 0.88em;
+    text-align: left;
+  }
+
+  .animal-btn:hover {
+    background: rgba(0,212,255,0.15);
+    border-color: #00d4ff55;
+  }
+
+  .animal-btn.active {
+    background: rgba(0,212,255,0.25);
+    border-color: #00d4ff;
+    color: #fff;
+    box-shadow: 0 0 10px rgba(0,212,255,0.2);
+  }
+
+  .animal-btn .icon { font-size: 1.3em; }
+
+  /* ===== 3D INTERACTIVE VIEWER (พื้นที่ตรงกลาง) ===== */
+  .viewer-area {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    position: relative;
+    overflow: hidden;
+    background: radial-gradient(ellipse at center, #0d2137 0%, #050e1a 100%);
+  }
+
+  .viewer-stage {
+    position: relative;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding-bottom: 60px;
+  }
+
+  .viewer-stage::before {
+    content: '';
+    position: absolute;
+    inset: 30px;
+    background-image:
+      linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 40px 40px;
+    border-radius: 16px;
+    pointer-events: none;
+  }
+
+  model-viewer {
+    width: 90%;
+    height: 90%;
+    background-color: transparent;
+    --progress-bar-color: #00d4ff;
+    --progress-bar-height: 4px;
+  }
+
+  /* ===== INFO PANEL (แผงขวา) ===== */
+  .info-panel {
+    width: 320px;
+    background: rgba(0,0,0,0.5);
+    border-left: 1px solid #00d4ff44;
+    padding: 20px 16px;
+    overflow-y: auto;
+    flex-shrink: 0;
+  }
+
+  .info-panel h2 { color: #00d4ff; font-size: 1.3em; margin-bottom: 4px; }
+  .info-panel .class-badge {
+    display: inline-block;
+    background: rgba(0,212,255,0.15);
+    border: 1px solid #00d4ff55;
+    border-radius: 20px;
+    padding: 3px 12px;
+    font-size: 0.78em;
+    color: #00d4ff;
+    margin-bottom: 16px;
+  }
+
+  .info-section { margin-bottom: 16px; }
+  .info-section h3 {
+    font-size: 0.85em;
+    color: #00d4ffaa;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
+    margin-bottom: 6px;
+    border-bottom: 1px solid #00d4ff22;
+    padding-bottom: 4px;
+  }
+  .info-section p { font-size: 0.88em; color: #c8dff0; line-height: 1.6; }
+
+  .feature-list { list-style: none; }
+  .feature-list li {
+    font-size: 0.85em;
+    color: #c8dff0;
+    padding: 3px 0;
+    display: flex;
+    align-items: flex-start;
+    gap: 6px;
+  }
+  .feature-list li::before { content: '▸'; color: #00d4ff; flex-shrink: 0; }
+
+  /* ===== CONTROL BUTTONS ===== */
+  .controls {
+    position: absolute;
+    bottom: 20px;
+    display: flex;
+    gap: 12px;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.6);
+    padding: 8px 16px;
+    border-radius: 30px;
+    border: 1px solid #00d4ff33;
+    backdrop-filter: blur(5px);
+  }
+
+  .ctrl-btn {
+    background: rgba(0,212,255,0.1);
+    border: 1px solid #00d4ff44;
+    color: #00d4ff;
+    border-radius: 20px;
+    padding: 6px 14px;
+    cursor: pointer;
+    font-size: 0.85em;
+    transition: all 0.2s;
+  }
+
+  .ctrl-btn:hover { background: rgba(0,212,255,0.25); border-color: #00d4ff; }
+  .ctrl-btn.active-spin { background: rgba(0,212,255,0.35); border-color: #00d4ff; box-shadow: 0 0 10px #00d4ff55; }
+
+  .welcome { text-align: center; color: #5a8ab0; }
+  .welcome .big-icon { font-size: 4.5em; margin-bottom: 12px; }
+  ::-webkit-scrollbar { width: 5px; }
+  ::-webkit-scrollbar-thumb { background: #00d4ff33; border-radius: 3px; }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>🔬 Virtual Lab — ระบบจำแนกกลุ่มสัตว์ (3D Interactive)</h1>
+  <p>คลิกลากบนโมเดลเพื่อหมุนรอบทิศทาง · หมุน Scroll ลูกกลิ้งเมาส์เพื่อซูมขยายโครงร่าง</p>
+</header>
+
+<div class="main-layout">
+
+  <div class="sidebar">
+    <div style="background: rgba(0,212,255,0.12); padding: 6px; border-radius: 6px; font-size:0.78em; color:#00d4ff; text-align:center; font-weight:bold; margin-bottom:8px;">
+      🔴 กลุ่มสัตว์มีกระดูกสันหลัง (Vertebrates)
+    </div>
+
+    <div class="group-title">🐟 Pisces (กลุ่มปลา)</div>
+    <button class="animal-btn" id="btn-fish" onclick="selectAnimal('fish')">
+      <span class="icon">🦴🐠</span>
+      <span>ปลากระดูกแข็ง</span>
+    </button>
+    <button class="animal-btn" id="btn-ray" onclick="selectAnimal('ray')">
+      <span class="icon">🦴🦈</span>
+      <span>ปลากระเบน</span>
+    </button>
+
+    <div class="group-title">🐸 Amphibia (ครึ่งบกครึ่งน้ำ)</div>
+    <button class="animal-btn" id="btn-salamander" onclick="selectAnimal('salamander')">
+      <span class="icon">🦴🦎</span>
+      <span>ซาลาแมนเดอร์</span>
+    </button>
+    <button class="animal-btn" id="btn-frog" onclick="selectAnimal('frog')">
+      <span class="icon">🦴🐸</span>
+      <span>กบ (ไม่มีหาง)</span>
+    </button>
+
+    <div class="group-title">🦎 Reptilia (สัตว์เลื้อยคลาน)</div>
+    <button class="animal-btn" id="btn-chameleon" onclick="selectAnimal('chameleon')">
+      <span class="icon">🦴🦎</span>
+      <span>กิ้งก่าคามีเลียน</span>
+    </button>
+
+    <div class="group-title">🦅 Aves (กลุ่มนก)</div>
+    <button class="animal-btn" id="btn-duck" onclick="selectAnimal('duck')">
+      <span class="icon">🦴🦆</span>
+      <span>เป็ด / นกน้ำ</span>
+    </button>
+
+    <div class="group-title">🐆 Mammalia (สัตว์เลี้ยงลูกด้วยนม)</div>
+    <button class="animal-btn" id="btn-cat" onclick="selectAnimal('cat')">
+      <span class="icon">🦴🐆</span>
+      <span>เสือซาเบอร์ทูธ</span>
+    </button>
+
+    <div style="background: rgba(232,131,74,0.12); padding: 6px; border-radius: 6px; font-size:0.78em; color:#e8834a; text-align:center; font-weight:bold; margin-top:15px; margin-bottom:8px;">
+      🔵 กลุ่มสัตว์ไม่มีกระดูกสันหลัง (Invertebrates)
+    </div>
+
+    <div class="group-title">Mollusca & Arthropoda</div>
+    <button class="animal-btn" id="btn-squid" onclick="selectAnimal('squid')">
+      <span class="icon">🦑</span>
+      <span>หมึกกล้วย</span>
+    </button>
+    <button class="animal-btn" id="btn-shrimp" onclick="selectAnimal('shrimp')">
+      <span class="icon">🦐</span>
+      <span>กุ้ง<span style="font-size:0.7em; display:block; color:#e8834a;">✨ โมเดล 3D ใหม่</span></span>
+    </button>
+  </div>
+
+  <div class="viewer-area" id="viewerArea">
+    <div class="viewer-stage" id="viewerStage">
+      <div class="welcome" id="welcomeMsg">
+        <div class="big-icon">🔬</div>
+        <p>เลือกรายการสัตว์จากเมนูด้านซ้าย<br>เพื่อเรียกสแกนโครงร่างโมเดล 3 มิติในห้องปฏิบัติการ</p>
+      </div>
+      <div id="modelContainer" style="display:none; width:100%; height:100%; display:flex; justify-content:center; align-items:center;"></div>
+    </div>
+
+    <div class="controls" id="controls" style="display:none">
+      <button class="ctrl-btn" onclick="control3D('reset')">↺ รีเซ็ตมุมมอง</button>
+      <button class="ctrl-btn" id="autoSpinBtn" onclick="control3D('toggle-spin')">▶ หมุนอัตโนมัติ</button>
+    </div>
+  </div>
+
+  <div class="info-panel" id="infoPanel">
+    <div style="text-align:center; color:#5a8ab0; padding-top:50px">
+      <div style="font-size:3.5em">📋</div>
+      <p style="font-size:0.9em; margin-top:12px">ข้อมูลโครงร่างและการจำแนก<br>จะปรากฏเมื่อเลือกสัตว์</p>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const ANIMAL_DATA = {
+  fish: {
+    name: 'ปลากระดูกแข็ง (โครงกระดูก)',
+    nameEn: 'Bony Fish 3D Skeleton',
+    group: 'Vertebrata — Pisces',
+    isVertebrate: true,
+    has3D: true,
+    fileUrl: 'https://cdn.jsdelivr.net/gh/nutthida-tech/virtual_lab@main/Meshy_AI_Fish_Skeleton_0602175652_generate.glb', 
+    desc: 'ปลากระดูกแข็งมีโครงสร้างภายในประกอบด้วยกระดูกแข็งแท้จริง มีเนื้อเยื่อแร่ธาตุแคลเซียมฟอสเฟตสะสมหนาแน่น ทำให้โครงข่ายกระดูกแข็งแรงทนทานต่อแรงดันน้ำ',
+    skeleton: 'มีโครงกระดูกแกนกลาง (ก้างหลัง) วางตัวยาวตามแนวลำตัว มีกระดูกซี่โครงแตกแขนงโค้งโอบรอบช่องท้อง และมีกระดูกกะโหลกศีรษะที่ปิดป้องสมองอย่างสมบูรณ์',
+    features: ['Endoskeleton (โครงร่างแข็งภายใน) เจริญสมบูรณ์', 'มีกระดูกสันหลังทำหน้าที่ค้ำจุนและปกป้องไขสันหลัง', 'มีฝาปิดเหงือก (Operculum) เป็นกระดูกแผ่นช่วยปกป้องระบบหายใจ', 'รยางค์พัฒนาเป็นครีบเดี่ยวและครีบคู่ยึดติดกับโครงกระดูกแกน']
+  },
+  ray: {
+    name: 'ปลากระเบน (โครงสร้างกระดูกอ่อน)',
+    nameEn: 'Stingray 3D Skeletal Structure',
+    group: 'Vertebrata — Chondrichthyes',
+    isVertebrate: true,
+    has3D: true,
+    fileUrl: 'https://cdn.jsdelivr.net/gh/nutthida-tech/virtual_lab@main/Meshy_AI_Winged_Fossil_0602173325_generate.glb',
+    desc: 'ปลากระเบนจัดเป็นปลากระดูกอ่อน ลำตัวแบนราบ แตกต่างจากปลากระดูกแข็งตรงที่โครงสร้างหลักไม่มีการสะสมของแร่ธาตุแคลเซียมหนาแน่นจนแข็งเป็นกระดูกแท้ แต่คงสภาพเป็นเนื้อเยื่อที่ยืดหยุ่นสูง มีการปรับตัวให้เข้ากับวิถีชีวิตบริเวณหน้าดิน',
+    skeleton: 'โครงร่างภายในทั้งตัวประกอบขึ้นจากเนื้อเยื่อกระดูกอ่อน (Cartilage) ที่มีน้ำหนักเบาและยืดหยุ่นได้ดี มีกระดูกแกนสันหลังแบนลง ส่วนครีบหู (Pectoral fins) แผ่ขยายกว้างมากและหลอมรวมเข้าเป็นผืนเดียวรอบส่วนหัวเพื่อใช้ในการโบกบินใต้น้ำ มีส่วนของฟอสซิลขากรรไกรและแผ่นโครงกระดูกที่พยุงรยางค์อย่างชัดเจน',
+    features: [
+      'โครงร่างภายในเป็นกระดูกอ่อน (Cartilage Endoskeleton) ทั้งหมด มีความยืดหยุ่นสูง',
+      'ไม่มีฝาปิดเหงือก (Operculum) โดยมีช่องเหงือก (Gill slits) เปิดออกทางด้านท้องจำนวน 5 คู่',
+      'ส่วนของกระดูกรยางค์ครีบหูแผ่ขยายกว้างรอบกะโหลกศีรษะและลำตัว ปรับตัวเพื่อว่ายน้ำราบไปกับหน้าดิน',
+      'มีโครงสร้างกระดูกสันหลังทอดยาวไปจนถึงส่วนโคนหางชัดเจน'
+    ]
+  },
+  salamander: {
+    name: 'ซาลาแมนเดอร์ (สัตว์ครึ่งบกครึ่งน้ำมีหาง)',
+    nameEn: 'Salamander Skeleton Structure',
+    group: 'Vertebrata — Amphibia (Order Caudata)',
+    isVertebrate: true,
+    has3D: true,
+    fileUrl: 'https://cdn.jsdelivr.net/gh/nutthida-tech/virtual-lab@main/Meshy_AI_Skeletal_Salamander_0602074252_texture.glb', 
+    desc: 'สัตว์สะเทินน้ำสะเทินบกกลุ่มที่มีหาง แตกต่างจากกลุ่มกบอย่างชัดเจน โดยซาลาแมนเดอร์จะยังคงรักษาลักษณะโครงสร้างลำตัวที่ยาวและมีหางยาวตลอดช่วงชีวิต',
+    skeleton: 'มีกระดูกสันหลังส่วนลำตัวจำนวนหลายข้อ และมีกระดูกส่วนหาง (Caudal vertebrae) ที่เจริญดี โครงกระดูกรยางค์ (ขาหน้า-ขาหลัง) ตั้งฉากยื่นออกข้างลำตัวคล้ายสัตว์เลื้อยคลานโบราณ มีกระดูกอกขนาดเล็กและกระดูกซี่โครงสั้นมากหรือลดรูปไป',
+    features: [
+      'เป็นสัตว์ครึ่งบกครึ่งน้ำที่โครงร่างยังคงมี "หาง" ยาวสมบูรณ์ตลอดชีวิต',
+      'กระดูกสันหลังแบ่งส่วนลำตัวและส่วนหางชัดเจน มีจำนวนข้อกระดูกมากกว่ากลุ่มกบ',
+      'ตำแหน่งของโครงกระดูกรยางค์ขา ออกแบบมาเพื่อการคลานราบไปกับพื้นและการว่ายน้ำโบกหาง',
+      'กะโหลกศีรษะแบนกว้าง โครงสร้างส่วนใหญ่ยังคงเป็นกระดูกอ่อนผสมร่วมกับกระดูกแข็ง'
+    ]
+  },
+  frog: {
+    name: 'กบ (สัตว์ครึ่งบกครึ่งน้ำไม่มีหาง)',
+    nameEn: 'Frog Skeleton Structure',
+    group: 'Vertebrata — Amphibia (Order Anura)',
+    isVertebrate: true,
+    has3D: true,
+    fileUrl: 'https://cdn.jsdelivr.net/gh/nutthida-tech/virtual_lab@main/Meshy_AI_Frog_Skeleton_0602165736_generate.glb', 
+    desc: 'สัตว์สะเทินน้ำสะเทินบกในอันดับอนูรา (Anura) ที่มีการปรับเปลี่ยนโครงสร้างร่างกายอย่างสุดขั้วเพื่อเอื้อประโยชน์ต่อการกระโดดและการว่ายน้ำอย่างรวดเร็ว ลำตัวสั้นป้อมและไม่มีหางในระยะตัวเต็มวัย',
+    skeleton: 'กระดูกสันหลังลดจำนวนข้อลงเหลือสั้นมาก (ประมาณ 9 ข้อ) ไม่มีกระดูกซี่โครงแท้จริง กระดูกสันหลังส่วนท้ายหลอมรวมกันเป็นแกนยาวแข็งแรงเรียกว่า "ยูโรสไตล์" (Urostyle) เพื่อรับแรงกระแทก กระดูกขาหลังและฝ่าเท้าแผ่ขยายยาวเป็นพิเศษเพิ่มแรงส่งในการดีดตัวกระโดด',
+    features: [
+      'โครงร่างสัตว์ครึ่งบกครึ่งน้ำระยะตัวเต็มวัยที่จะ "ไม่มีกระดูกส่วนหาง"',
+      'มีกระดูกสันหลังส่วนท้ายหลอมรวมเป็นแท่งยาว (Urostyle) ช่วยกระจายและรับแรงกระแทกจากการกระโดด',
+      'กระดูกรยางค์ขาหลังยาวและแข็งแรงกว่าขาหน้าอย่างเห็นได้ชัด',
+      'ไม่มีกระดูกซี่โครงแผ่ขยาย (กระดูกอกเชื่อมกับแถบกระดูกไหล่เพื่อพยุงอวัยวะภายใน)'
+    ]
+  },
+  chameleon: {
+    name: 'กิ้งก่าคามีเลียน (สัตว์เลื้อยคลาน)',
+    nameEn: 'Chameleon 3D Structure',
+    group: 'Vertebrata — Reptilia',
+    isVertebrate: true,
+    has3D: true,
+    fileUrl: 'https://cdn.jsdelivr.net/gh/nutthida-tech/virtual_lab@main/Chameleon.glb', 
+    desc: 'สัตว์เลื้อยคลานที่มีโครงสร้างกระดูกเอื้อต่อการดำรงชีวิตและพรางตัวอยู่บนต้นไม้สูง โครงสร้างกระดูกมีความเฉพาะตัวและพัฒนาขากรรไกรเพื่อยิงลิ้นล่าเหยื่อได้อย่างรวดเร็ว',
+    skeleton: 'กระดูกซี่โครงเจริญดีมากและยาวลงมาโอบล้อมช่องอกและช่องท้องเกือบทั้งหมด กระดูกหางยาวและสามารถม้วนงอเพื่อใช้ยึดจับกิ่งไม้แทนมือเท้าได้ (Prehensile tail) มีระบบกระดูกไฮออยด์ (Hyoid apparatus) ในปากที่ยาวเป็นพิเศษสำหรับรองรับกล้ามเนื้อลิ้นความเร็วสูง',
+    features: [
+      'กระดูกนิ้วเท้าเชื่อมแยกออกเป็นสองกลุ่ม (Zygodactylous) คอยหนีบคีบกิ่งไม้ได้อย่างมั่นคง',
+      'กระดูกหางสามารถม้วนงอเพื่อช่วยพยุงและเกาะเกี่ยวโครงสร้างกิ่งไม้แข็งแรง',
+      'กะโหลกส่วนหลังยกตัวเป็นสันรูปมงกุฎสามเหลี่ยมเด่นชัดเพื่อเป็นจุดยึจกล้ามเนื้อตาที่หมุนอิสระ',
+      'โครงร่างแข็งภายในกลุ่มสัตว์เลื้อยคลานแท้ มีผิวหนังปกคลุมด้วยเกล็ดสารเคราติน'
+    ]
+  },
+  duck: {
+    name: 'เป็ด / สัตว์ปีก (กลุ่มนก)',
+    nameEn: 'Duck 3D Model Structure',
+    group: 'Vertebrata — Aves',
+    isVertebrate: true,
+    has3D: true,
+    fileUrl: 'https://cdn.jsdelivr.net/gh/nutthida-tech/virtual_lab@main/duck.glb',
+    desc: 'สัตว์ปีกกลุ่มนกน้ำที่มีการปรับเปลี่ยนโครงสร้างร่างกายอย่างยอดเยี่ยมเพื่อให้สามารถลอยน้ำ ดำน้ำ และบินพยุงตัวได้ โครงร่างมีความเบาแต่แข็งแกร่งอย่างสมดุล',
+    skeleton: 'กระดูกมีลักษณะกลวงและเป็นโพรงคล้ายรังผึ้ง (Pneumatic bones) เพื่อลดน้ำหนักของร่างกาย มีกระดูกอกขนาดแผ่ขยายเป็นสันใหญ่กว้าง (Keel) สำหรับใช้ยึดเกาะของมัดกล้ามเนื้ออกขนาดใหญ่ในการขยับพัดปีก และกระดูกสันหลังส่วนท้ายหลอมรวมกันเพื่อเพิ่มความมั่นคงขณะทรงตัว',
+    features: [
+      'โครงร่างแข็งภายในกลุ่มสัตว์ปีก (Aves Endoskeleton) มีน้ำหนักเบามาก',
+      'มีกระดูกกลวงและมีถุงลม (Air sacs) แทรกสอดเพื่อเอื้อต่อการพยุงลำตัว',
+      'กระดูกอกมีสันยึดกล้ามเนื้อ (Keel) ที่เจริญดีสำหรับใช้พยุงและควบคุมทิศทาง',
+      'ส่วนโครงสร้างรยางค์หน้าพัฒนาเปลี่ยนรูปไปเป็นปีกอย่างสมบูรณ์'
+    ]
+  },
+  cat: {
+    name: 'เสือซาเบอร์ทูธ (โครงกระดูกและกะโหลก)',
+    nameEn: 'Saber-toothed Tiger Skeleton',
+    group: 'Vertebrata — Mammalia',
+    isVertebrate: true,
+    has3D: true,
+    fileUrl: 'https://cdn.jsdelivr.net/gh/nutthida-tech/virtual_lab@main/Meshy_AI_Saber_toothed_tiger_s_0602064839_generate.glb',
+    desc: 'สัตว์เลี้ยงลูกด้วยนมกินเนื้อในยุคโบราณ มีโครงสร้างกระดูกแกนและกระดูกรยางค์ที่หนา แข็งแกร่ง ออกแบบมาเพื่อการล่าและรองรับแรงกระแทกจากการกระโจนตะปบเหยื่อ',
+    skeleton: 'กะโหลกศีรษะหนาและมีส่วนโค้งของรอยต่อกระดูก (Sutures) ที่ยืดหยุ่น จุดเด่นคือขากรรไกรบนพัฒนาเบ้าฟันเขี้ยวยาวโค้งมนคล้ายใบดาบสำหรับเจาะทะลวง',
+    features: ['เป็นโครงร่างแข็งภายในกลุ่มสัตว์เลี้ยงลูกด้วยนม (Mammalian Endoskeleton)', 'กระดูกสันหลังแบ่งส่วนชัดเจน ยืดหยุ่นสูง', 'มีส่วนโครงกระดูกรยางค์ขาหน้า-ขาหลังที่แข็งแรงมาก', 'เบ้าตารวมขากรรไกรขนาดใหญ่ ออกแบบมาเพื่อรองรับมัดกล้ามเนื้อบดเคี้ยวอันทรงพลัง']
+  },
+  squid: {
+    name: 'หมึกกล้วย (สัตว์ไม่มีกระดูกสันหลัง)',
+    nameEn: 'Squid 3D Model Structure',
+    group: 'Invertebrata — Mollusca',
+    isVertebrate: false,
+    has3D: true,
+    fileUrl: 'https://cdn.jsdelivr.net/gh/nutthida-tech/virtual_lab@main/Squid.glb',
+    desc: 'สัตว์ไม่มีกระดูกสันหลังกลุ่มมอลลัสกา (ไฟลัมย่อย Cephalopoda) ลำตัวอ่อนนิ่ม ไม่มีกระดูกแข็งแท้จริงหรือกระดูกอ่อนภายในร่าง แต่สร้างแกนค้ำจุนเฉพาะตัวขึ้นมาเพื่อช่วยในการคงรูปทรง',
+    skeleton: 'ไม่มีระบบกระดูกแกนกลางที่สลายตัวยาก แต่มีการพัฒนาแผ่นสารอินทรีย์ใสยาวคล้ายขนนกหรือไม้บรรทัด เรียกว่า "เพน" (Pen) ซ่อนอยู่ภายในเนื้อแมนเทิลทางด้านหลัง ทำหน้าที่เป็นโครงร่างแกนค้ำจุนพยุงรูปทรงกระบอกของลำตัว',
+    features: [
+      'ไม่มีข้อต่อหรือกระดูกสันหลัง (Invertebrate) จัดอยู่ในกลุ่มหอยและหมึก',
+      'ค้ำจุนเนื้อเยื่อรอบลำตัวด้วยแผ่นสารไคตินโปร่งแสง (Squid Pen) ภายในตัว',
+      'เคลื่อนที่อย่างรวดเร็วโดยใช้แรงดันน้ำผ่านท่อพ่นน้ำ (Siphon) หรือระบบ Jet Propulsion',
+      'มีระบบประสาทที่เจริญดี มีดวงตาขนาดใหญ่และซับซ้อนใกล้เคียงกับสัตว์มีกระดูกสันหลัง'
+    ]
+  },
+  shrimp: {
+    name: 'กุ้ง (โครงสร้างกายวิภาค 3D)',
+    nameEn: 'Shrimp Anatomy 3D Model',
+    group: 'Invertebrata — Arthropoda',
+    isVertebrate: false,
+    has3D: true,
+    fileUrl: 'https://cdn.jsdelivr.net/gh/nutthida-tech/virtual_lab@main/Meshy_AI_Shrimp_Anatomy_0602181107_generate.glb',
+    desc: 'กุ้งจัดเป็นสัตว์ไม่มีกระดูกสันหลังในกลุ่มครัสเตเชียน มีโครงร่างแข็งภายนอก (Exoskeleton) ที่มีความแข็งแรงสูงและมีการปรับตัวให้เข้ากับการเคลื่อนที่และปกป้องอวัยวะภายในในสภาพแวดล้อมน้ำ',
+    skeleton: 'กุ้งไม่มีโครงกระดูกภายใน (Endoskeleton) แต่มีเปลือกหุ้มภายนอก (Exoskeleton) ที่ประกอบด้วยสารไคตินหนาและแร่ธาตุแคลเซียมคาร์บอเนต โมเดลนี้แสดงให้เห็นถึงการแบ่งส่วนของส่วนหัวและอกที่หลอมรวมกัน (Cephalothorax) และส่วนท้องที่มีข้อปล้องชัดเจนเพื่อการว่ายน้ำ',
+    features: [
+      'มีโครงร่างแข็งภายนอก (Exoskeleton) ป้องกันอันตรายและค้ำจุนร่างกาย',
+      'ส่วนหัวและอกหลอมรวมกันมีเปลือก (Carapace) ปกคลุมแข็งแรง',
+      'ส่วนท้องแบ่งเป็นปล้อง ช่วยให้กุ้งสามารถดีดตัวว่ายน้ำถอยหลังเพื่อหลบหลีกศัตรูได้อย่างรวดเร็ว',
+      'โครงสร้างมีการลอกคราบเพื่อการเจริญเติบโตตลอดช่วงชีวิต'
+    ]
+  }
+};
+
+function selectAnimal(key) {
+  const data = ANIMAL_DATA[key];
+  if (!data) return;
+
+  document.querySelectorAll('.animal-btn').forEach(btn => btn.classList.remove('active'));
+  const activeBtn = document.getElementById('btn-' + key);
+  if (activeBtn) activeBtn.classList.add('active');
+
+  document.getElementById('welcomeMsg').style.display = 'none';
+  const container = document.getElementById('modelContainer');
+  container.style.display = 'flex';
+  container.innerHTML = ''; 
+
+  if (data.has3D) {
+    document.getElementById('controls').style.display = 'flex';
+    resetSpinButton();
+
+    const viewer = document.createElement('model-viewer');
+    viewer.id = 'activeModel';
+    
+    const finalUrl = data.fileUrl + '?v=' + new Date().getTime();
+    
+    viewer.setAttribute('src', finalUrl);
+    viewer.setAttribute('alt', data.name);
+    viewer.setAttribute('camera-controls', ''); 
+    viewer.setAttribute('touch-action', 'pan-y');
+    viewer.setAttribute('shadow-intensity', '1.5');
+    viewer.setAttribute('exposure', '1.2');
+    viewer.setAttribute('bounds', 'tight');
+    viewer.setAttribute('camera-orbit', 'auto auto auto');
+    viewer.setAttribute('field-of-view', 'auto');
+    viewer.setAttribute('auto-rotate', ''); 
+    
+    container.appendChild(viewer);
+  }
+
+  updateInfoPanel(data);
+}
+
+function updateInfoPanel(data) {
+  const panel = document.getElementById('infoPanel');
+  const sectionTitle = data.isVertebrate ? "🦴 ระบบโครงกระดูกแกนกลางภายใน" : "🛡️ โครงร่างแข็ง/สิ่งค้ำจุนภายในหรือภายนอกร่างกาย";
+  const bColor = data.isVertebrate ? "rgba(0,212,255,0.15)" : "rgba(232,131,74,0.15)";
+  const bBorder = data.isVertebrate ? "#00d4ff55" : "#e8834a55";
+  const bText = data.isVertebrate ? "#00d4ff" : "#e8834a";
+
+  panel.innerHTML = `
+    <h2>${data.name}</h2>
+    <div class="class-badge" style="background:${bColor}; border:1px solid ${bBorder}; color:${bText};">${data.group}</div>
+    <div class="info-section"><h3>📖 ลักษณะทางชีววิทยา</h3><p>${data.desc}</p></div>
+    <div class="info-section"><h3>${sectionTitle}</h3><p>${data.skeleton}</p></div>
+    <div class="info-section"><h3>✅ เกณฑ์จำแนกและอนุกรมวิธาน</h3><ul class="feature-list">${data.features.map(f => `<li>${f}</li>`).join('')}</ul></div>
+  `;
+}
+
+function control3D(action) {
+  const viewer = document.getElementById('activeModel');
+  if (!viewer) return;
+  if (action === 'reset') {
+    viewer.cameraOrbit = 'auto auto auto';
+    viewer.jumpCameraToGoal();
+  } else if (action === 'toggle-spin') {
+    const btn = document.getElementById('autoSpinBtn');
+    if (viewer.hasAttribute('auto-rotate')) {
+      viewer.removeAttribute('auto-rotate');
+      btn.textContent = '▶ หมุนอัตโนมัติ';
+    } else {
+      viewer.setAttribute('auto-rotate', '');
+      btn.textContent = '⏸ หยุดหมุน';
+    }
+  }
+}
+
+function resetSpinButton() {
+  const btn = document.getElementById('autoSpinBtn');
+  if (btn) btn.textContent = '▶ หมุนอัตโนมัติ';
+}
+</script>
+</body>
+</html>
